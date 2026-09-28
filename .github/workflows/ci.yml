@@ -1,0 +1,180 @@
+name: mkt-monitor CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "mkt-monitor/**"
+      - ".github/workflows/ci.yml"
+
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "mkt-monitor/**"
+      - ".github/workflows/ci.yml"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Kubernetes 内部访问 Harbor
+  HARBOR_REGISTRY: harbor.harbor.svc.cluster.local
+
+  # Harbor 项目
+  HARBOR_PROJECT: library
+
+  # 镜像名称
+  IMAGE_NAME: mkt-monitor
+
+jobs:
+
+  # ============================================================
+  # 1. Checkout
+  # ============================================================
+  checkout:
+    name: Checkout
+    runs-on: arc-runner-set
+
+    steps:
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Show commit
+        run: |
+          echo "Commit:"
+          git rev-parse HEAD
+
+          echo "Branch:"
+          git branch --show-current
+
+          echo "Changed files:"
+          git diff --name-only HEAD^ HEAD || true
+
+
+  # ============================================================
+  # 2. Build + Trivy
+  # ============================================================
+  build-and-scan:
+    name: Build and Trivy Scan
+    needs: checkout
+    runs-on: arc-runner-set
+
+    steps:
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # --------------------------------------------------------
+      # Harbor Login
+      # --------------------------------------------------------
+      - name: Login Harbor
+        run: |
+          echo "${{ secrets.HARBOR_PASSWORD }}" | \
+          docker login \
+            "${HARBOR_REGISTRY}" \
+            -u "${{ secrets.HARBOR_USERNAME }}" \
+            --password-stdin
+
+      # --------------------------------------------------------
+      # Docker Build
+      # --------------------------------------------------------
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg HARBOR_REGISTRY="${HARBOR_REGISTRY}" \
+            -t "${HARBOR_REGISTRY}/${HARBOR_PROJECT}/${IMAGE_NAME}:${GITHUB_SHA}" \
+            -t "${HARBOR_REGISTRY}/${HARBOR_PROJECT}/${IMAGE_NAME}:latest" \
+            .
+
+      # --------------------------------------------------------
+      # Image information
+      # --------------------------------------------------------
+      - name: Show Docker image
+        run: |
+          docker images "${HARBOR_REGISTRY}/${HARBOR_PROJECT}/${IMAGE_NAME}"
+
+      # --------------------------------------------------------
+      # Install Trivy
+      # --------------------------------------------------------
+      - name: Install Trivy
+        run: |
+          apt-get update
+          apt-get install -y wget
+
+          wget -qO- \
+            https://aquasecurity.github.io/trivy-repo/deb/public.key \
+            | gpg --dearmor \
+            -o /usr/share/keyrings/trivy.gpg
+
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] \
+            https://aquasecurity.github.io/trivy-repo/deb \
+            generic main" \
+            > /etc/apt/sources.list.d/trivy.list
+
+          apt-get update
+          apt-get install -y trivy
+
+      # --------------------------------------------------------
+      # Trivy Scan
+      #
+      # 当前先不阻断 CI
+      # 因为 mkt-monitor 当前故意保留测试漏洞
+      # --------------------------------------------------------
+      - name: Trivy scan
+        run: |
+          trivy image \
+            --severity HIGH,CRITICAL \
+            --exit-code 0 \
+            "${HARBOR_REGISTRY}/${HARBOR_PROJECT}/${IMAGE_NAME}:${GITHUB_SHA}"
+
+
+  # ============================================================
+  # 3. Push Harbor
+  # ============================================================
+  push:
+    name: Push to Harbor
+    needs: build-and-scan
+    runs-on: arc-runner-set
+
+    steps:
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Login Harbor
+        run: |
+          echo "${{ secrets.HARBOR_PASSWORD }}" | \
+          docker login \
+            "${HARBOR_REGISTRY}" \
+            -u "${{ secrets.HARBOR_USERNAME }}" \
+            --password-stdin
+
+      - name: Build image
+        run: |
+          docker build \
+            --build-arg HARBOR_REGISTRY="${HARBOR_REGISTRY}" \
+            -t "${HARBOR_REGISTRY}/${HARBOR_PROJECT}/${IMAGE_NAME}:${GITHUB_SHA}" \
+            -t "${HARBOR_REGISTRY}/${HARBOR_PROJECT}/${IMAGE_NAME}:latest" \
+            .
+
+      - name: Push commit image
+        run: |
+          docker push \
+            "${HARBOR_REGISTRY}/${HARBOR_PROJECT}/${IMAGE_NAME}:${GITHUB_SHA}"
+
+      - name: Push latest
+        run: |
+          docker push \
+            "${HARBOR_REGISTRY}/${HARBOR_PROJECT}/${IMAGE_NAME}:latest"
+
+      - name: Show image digest
+        run: |
+          docker inspect \
+            --format='{{index .RepoDigests 0}}' \
+            "${HARBOR_REGISTRY}/${HARBOR_PROJECT}/${IMAGE_NAME}:${GITHUB_SHA}" \
+            || true

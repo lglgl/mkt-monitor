@@ -1,0 +1,28 @@
+name: ARC Runner Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: arc-mkt-monitor
+
+    steps:
+      - name: Check runner
+        run: |
+          echo "================================"
+          echo "ARC Runner Test"
+          echo "================================"
+          echo "Runner:"
+          uname -a
+
+          echo
+          echo "Docker:"
+          docker version
+
+          echo
+          echo "Docker Info:"
+          docker info
