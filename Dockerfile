@@ -1,23 +1,8 @@
 # =========================================================
-# Harbor Registry
-#
-# Local default:
-#   harbor.local:8088
-#
-# Kubernetes ARC:
-#   harbor.harbor.svc.cluster.local
-#
-# CI can override this value with --build-arg.
-# =========================================================
-
-ARG HARBOR_REGISTRY=harbor.local:8088
-
-
-# =========================================================
 # Stage 1: Build
 # =========================================================
 
-FROM ${HARBOR_REGISTRY}/dockerhub-proxy/library/eclipse-temurin:21-jdk AS builder
+FROM eclipse-temurin:21-jdk AS builder
 
 WORKDIR /build
 
@@ -36,7 +21,7 @@ RUN ./gradlew clean bootJar --no-daemon
 # Stage 2: Runtime
 # =========================================================
 
-FROM ${HARBOR_REGISTRY}/dockerhub-proxy/library/eclipse-temurin:21-jre
+FROM eclipse-temurin:21-jre
 
 WORKDIR /app
 
