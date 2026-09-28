@@ -1,1 +1,23 @@
+import org.gradle.api.initialization.resolve.RepositoriesMode
+
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+
+    repositories {
+        maven {
+            name = "Aliyun"
+            url = uri("https://maven.aliyun.com/repository/public")
+        }
+
+        mavenCentral()
+    }
+}
+
 rootProject.name = 'mkt-monitor'

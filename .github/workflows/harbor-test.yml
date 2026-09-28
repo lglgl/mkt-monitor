@@ -1,0 +1,43 @@
+name: Harbor Proxy Cache Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HARBOR_REGISTRY: harbor.harbor.svc.cluster.local
+
+jobs:
+
+  harbor-test:
+
+    runs-on: arc-runner-set
+
+    steps:
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Check Harbor
+        run: |
+          echo "Testing Harbor:"
+          echo "http://${HARBOR_REGISTRY}/v2/"
+
+          curl -v \
+            --http1.1 \
+            "http://${HARBOR_REGISTRY}/v2/"
+
+
+      - name: Test Docker Build
+        run: |
+          docker build \
+            --build-arg HARBOR_REGISTRY=${HARBOR_REGISTRY} \
+            -t mkt-monitor:harbor-test \
+            .
+
+
+      - name: Check image
+        run: |
+          docker images mkt-monitor

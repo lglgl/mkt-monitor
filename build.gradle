@@ -6,7 +6,7 @@ plugins {
 
 group = 'cn.dahouzi'
 version = '0.0.1-SNAPSHOT'
-description = 'mkt-monitor'
+description = 'Market Monitor - DevSecOps Lab'
 
 java {
     toolchain {
@@ -14,17 +14,46 @@ java {
     }
 }
 
-repositories {
-    mavenCentral()
-}
-
 dependencies {
+
+    // =========================================================
+    // 1. Application dependencies
+    // =========================================================
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-    runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
-    testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
+
+    // =========================================================
+    // 2. INTENTIONAL VULNERABILITIES
+    //
+    // These dependencies are intentionally outdated.
+    // They are ONLY used for the DevSecOps security pipeline lab.
+    //
+    // Trivy should detect these vulnerabilities during CI.
+    //
+    // DO NOT use these versions in production.
+    // =========================================================
+
+    // INTENTIONAL VULNERABILITY
+    // Log4Shell and related vulnerabilities.
+    // Fixed versions are newer than 2.14.1.
+    implementation 'org.apache.logging.log4j:log4j-core:2.14.1'
+
+    // INTENTIONAL VULNERABILITY
+    // Commons Text vulnerability.
+    // Fixed version: 1.10.0
+    implementation 'org.apache.commons:commons-text:1.9'
+
+
+    // =========================================================
+    // 3. Test
+    // =========================================================
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
 tasks.named('test') {
