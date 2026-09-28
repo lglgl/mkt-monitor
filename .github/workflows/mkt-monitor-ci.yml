@@ -1,0 +1,39 @@
+name: mkt-monitor CI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: arc-mkt-monitor
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check environment
+        run: |
+          echo "=== Runner ==="
+          uname -a
+
+          echo
+          echo "=== Docker ==="
+          docker version
+
+          echo
+          echo "=== Docker Info ==="
+          docker info
+
+      - name: Build Docker Image
+        run: |
+          docker build \
+            --build-arg HARBOR_REGISTRY=harbor.harbor.svc.cluster.local \
+            -t mkt-monitor:test \
+            .
+
+      - name: Check Image
+        run: |
+          docker images
