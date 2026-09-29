@@ -1,0 +1,19 @@
+
+githubConfigUrl: "https://github.com/lglgl/mkt-monitor"
+
+githubConfigSecret: "arc-github-app"
+
+minRunners: 0
+
+maxRunners: 2
+
+
+containerMode:
+  type: dind
+  dockerDaemonConfig: |
+    {
+      "insecure-registries": [
+        "host.docker.internal:8088"
+      ]
+    }
+

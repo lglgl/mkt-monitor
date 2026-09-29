@@ -1,62 +1,113 @@
-name: mkt-monitor CI
+name: mkt-monitor 镜像构建发布 CI
+
 
 on:
+
   workflow_dispatch:
 
+
 permissions:
+
   contents: read
 
 
 env:
+
   HARBOR_REGISTRY: host.docker.internal:8088
-  IMAGE_NAME: library/mkt-monitor
+
+  IMAGE_NAME: library/mkt-monitor_$(date +%Y%m%d)
 
 
 jobs:
+
+
   build:
+
+
+    name: 构建并上传 Harbor 镜像
 
     runs-on: arc-mkt-monitor
 
+
     steps:
 
-      - name: Checkout
+
+      - name: 拉取代码
+
         uses: actions/checkout@v4
 
 
-      - name: Check Environment
+
+      - name: 初始化环境
+
         run: |
+
+          echo "========== Runner =========="
+
           uname -a
+
+
+          echo "========== Docker =========="
+
           docker version
 
 
-      # 登录 Harbor
-      - name: Login Harbor
+
+      - name: 设置镜像版本
+
         run: |
+
+          DATE=$(date +%Y%m%d)
+
+          SHA=$(git rev-parse --short HEAD)
+
+
+          echo "IMAGE_NAME=library/mkt-monitor_${DATE}" >> $GITHUB_ENV
+
+          echo "IMAGE_TAG=${SHA}" >> $GITHUB_ENV
+
+
+
+      - name: 登录 Harbor
+
+        run: |
+
           echo "${{ secrets.HARBOR_PASSWORD }}" | \
+
           docker login \
-            $HARBOR_REGISTRY \
-            -u "${{ secrets.HARBOR_USERNAME }}" \
-            --password-stdin
+
+          $HARBOR_REGISTRY \
+
+          -u "${{ secrets.HARBOR_USERNAME }}" \
+
+          --password-stdin
 
 
-      # Build
-      - name: Build Image
+
+      - name: 构建 Docker 镜像
+
         run: |
 
           docker build \
-            -t $HARBOR_REGISTRY/$IMAGE_NAME:test \
-            .
+
+          -t $HARBOR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+
+          .
 
 
-      # Push
-      - name: Push Image
+
+      - name: 上传 Harbor
+
         run: |
 
           docker push \
-          $HARBOR_REGISTRY/$IMAGE_NAME:test
+
+          $HARBOR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
 
 
-      # Verify
-      - name: Check Image
+
+      - name: 查看镜像
+
         run: |
+
           docker images
