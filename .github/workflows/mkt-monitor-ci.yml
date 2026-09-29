@@ -109,7 +109,9 @@ jobs:
 
             # =====================================
             # =====================================
+            # =====================================
       # 安装 MinIO Client
+      # GitHub Release
       # ARM64 Runner
       # =====================================
 
@@ -120,19 +122,24 @@ jobs:
           MC_VERSION="RELEASE.2025-08-13T08-35-41Z"
 
 
-          echo "Download MinIO Client"
+          MC_URL="https://github.com/minio/mc/releases/download/${MC_VERSION}/mc.linux-arm64.${MC_VERSION}"
+
+
+          echo "Download:"
+          echo $MC_URL
 
 
           curl -fL \
-          https://dl.min.io/client/mc/release/linux-arm64/archive/mc.${MC_VERSION} \
+          $MC_URL \
           -o mc
 
 
 
-          echo "Check binary"
+          echo "Check file"
 
 
           file mc
+
 
 
           chmod +x mc
