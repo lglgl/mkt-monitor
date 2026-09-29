@@ -107,41 +107,35 @@ jobs:
 
 
 
-      # =====================================
+            # =====================================
       # 安装 MinIO Client
+      # 固定版本 ARM64
       # =====================================
 
       - name: 安装 MinIO Client
 
         run: |
 
-          ARCH=$(uname -m)
+
+          MC_VERSION="RELEASE.2025-08-13T08-35-41Z"
 
 
-          if [ "$ARCH" = "aarch64" ]; then
+          wget \
+          https://dl.min.io/client/mc/release/linux-arm64/archive/mc.${MC_VERSION} \
+          -O mc
 
-            MC_URL="https://dl.min.io/client/mc/release/linux-arm64/mc"
-
-          else
-
-            MC_URL="https://dl.min.io/client/mc/release/linux-amd64/mc"
-
-          fi
-
-
-          echo "Download: $MC_URL"
-
-
-          curl -fL $MC_URL -o mc
 
 
           chmod +x mc
 
 
+
           sudo mv mc /usr/local/bin/mc
 
 
+
           file /usr/local/bin/mc
+
 
 
           mc --version
