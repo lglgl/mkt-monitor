@@ -14,9 +14,14 @@ permissions:
 
 env:
 
+  # Harbor 地址
   HARBOR_REGISTRY: host.docker.internal:8088
 
-  IMAGE_REPOSITORY: library/mkt-monitor
+  # Harbor 用户
+  HARBOR_USERNAME: admin
+
+  # Harbor 密码
+  HARBOR_PASSWORD: HarborLab-2026-ChangeMe
 
 
 
@@ -36,10 +41,9 @@ jobs:
     steps:
 
 
-
-      # ==========================
-      # 拉取代码
-      # ==========================
+      # ==============================
+      # Checkout代码
+      # ==============================
 
       - name: 拉取代码
 
@@ -47,9 +51,9 @@ jobs:
 
 
 
-      # ==========================
+      # ==============================
       # 环境检查
-      # ==========================
+      # ==============================
 
       - name: 初始化环境
 
@@ -68,13 +72,13 @@ jobs:
 
 
 
-      # ==========================
+      # ==============================
       # 生成镜像版本
       #
-      # 格式:
-      # 20260929-a1b2c3d
+      # 示例:
+      # mkt-monitor:20260929-9101603
       #
-      # ==========================
+      # ==============================
 
       - name: 设置镜像版本
 
@@ -85,75 +89,28 @@ jobs:
           SHA=$(git rev-parse --short HEAD)
 
 
-          IMAGE_TAG=${DATE}-${SHA}
+          echo "IMAGE_NAME=library/mkt-monitor" >> $GITHUB_ENV
+
+          echo "IMAGE_TAG=${DATE}-${SHA}" >> $GITHUB_ENV
 
 
-          echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
-
-
-          echo "IMAGE_FULL_NAME=${HARBOR_REGISTRY}/${IMAGE_REPOSITORY}:${IMAGE_TAG}" >> $GITHUB_ENV
-
-
-          echo "IMAGE_FULL_NAME=${HARBOR_REGISTRY}/${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+          echo "Image: mkt-monitor:${DATE}-${SHA}"
 
 
 
-      # ==========================
-      # Harbor 网络检查
-      # ==========================
-
-      - name: 检查 Harbor Registry
-
-        run: |
-
-          echo "Check Harbor"
-
-          curl -I \
-          http://${HARBOR_REGISTRY}/v2/ || true
-
-
-
-      # ==========================
+      # ==============================
       # 登录 Harbor
-      # ==========================
+      # ==============================
 
       - name: 登录 Harbor
 
-        env:
-
-          HARBOR_USERNAME: ${{ secrets.HARBOR_USERNAME }}
-
-          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
-
-
         run: |
-
-
-          if [ -z "$HARBOR_USERNAME" ]; then
-
-            echo "HARBOR_USERNAME missing"
-
-            exit 1
-
-          fi
-
-
-
-          if [ -z "$HARBOR_PASSWORD" ]; then
-
-            echo "HARBOR_PASSWORD missing"
-
-            exit 1
-
-          fi
-
-
 
           echo "$HARBOR_PASSWORD" | \
 
           docker login \
 
-          ${HARBOR_REGISTRY} \
+          "$HARBOR_REGISTRY" \
 
           --username "$HARBOR_USERNAME" \
 
@@ -161,56 +118,48 @@ jobs:
 
 
 
-      # ==========================
+      # ==============================
       # Build
-      # ==========================
+      # ==============================
 
       - name: 构建 Docker 镜像
 
         run: |
 
-
           docker build \
 
-          -t ${IMAGE_FULL_NAME} \
+          -t $HARBOR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
 
           .
 
 
 
-      # ==========================
-      # Push
-      # ==========================
+      # ==============================
+      # Push Harbor
+      # ==============================
 
-      - name: 上传 Harbor
-
+      - name: 上传 Harbor 镜像
 
         run: |
 
+          docker push \
 
-          docker push ${IMAGE_FULL_NAME}
+          $HARBOR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
 
 
 
-      # ==========================
+      # ==============================
       # 验证
-      # ==========================
+      # ==============================
 
       - name: 查看镜像
 
-
         run: |
-
-
-          echo "========== Local Images =========="
-
 
           docker images
 
-
           echo
 
-          echo "========== Build Image =========="
+          echo "========== Harbor Image =========="
 
-
-          echo ${IMAGE_FULL_NAME}
+          echo "$HARBOR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
