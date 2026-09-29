@@ -172,7 +172,10 @@ jobs:
 
           docker images
 
-
+      - name: Docker Registry Check
+        run: |
+          
+          docker info | grep -A10 "Insecure Registries"
 
       # =====================================
       # Push Harbor
