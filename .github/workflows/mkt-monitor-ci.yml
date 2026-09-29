@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 
+
 permissions:
 
   contents: read
@@ -20,7 +21,7 @@ env:
   # Harbor 用户
   HARBOR_USERNAME: admin
 
-  # Harbor 密码
+  # 实验环境密码
   HARBOR_PASSWORD: HarborLab-2026-ChangeMe
 
 
@@ -41,9 +42,9 @@ jobs:
     steps:
 
 
-      # ==============================
-      # Checkout代码
-      # ==============================
+      # =====================================
+      # Checkout
+      # =====================================
 
       - name: 拉取代码
 
@@ -51,11 +52,11 @@ jobs:
 
 
 
-      # ==============================
+      # =====================================
       # 环境检查
-      # ==============================
+      # =====================================
 
-      - name: 初始化环境
+      - name: Runner 环境检查
 
         run: |
 
@@ -66,19 +67,36 @@ jobs:
 
           echo
 
-          echo "========== Docker =========="
+          echo "========== Docker Version =========="
 
           docker version
 
 
 
-      # ==============================
-      # 生成镜像版本
+      # =====================================
+      # Harbor 网络检查
+      # =====================================
+
+      - name: Harbor 连通性检查
+
+        run: |
+
+          echo "========== Harbor Test =========="
+
+
+          curl -v \
+          http://$HARBOR_REGISTRY/v2/ || true
+
+
+
+      # =====================================
+      # 设置镜像版本
       #
       # 示例:
-      # mkt-monitor:20260929-9101603
       #
-      # ==============================
+      # host.docker.internal:8088/library/mkt-monitor:20260929-a1b2c3d
+      #
+      # =====================================
 
       - name: 设置镜像版本
 
@@ -89,58 +107,81 @@ jobs:
           SHA=$(git rev-parse --short HEAD)
 
 
+          IMAGE_TAG=${DATE}-${SHA}
+
+
           echo "IMAGE_NAME=library/mkt-monitor" >> $GITHUB_ENV
 
-          echo "IMAGE_TAG=${DATE}-${SHA}" >> $GITHUB_ENV
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
 
 
-          echo "Image: mkt-monitor:${DATE}-${SHA}"
+          echo "=============================="
+
+          echo "IMAGE TAG: ${IMAGE_TAG}"
+
+          echo "=============================="
 
 
 
-      # ==============================
+      # =====================================
       # 登录 Harbor
-      # ==============================
+      #
+      # 实验环境明文
+      # =====================================
 
       - name: 登录 Harbor
 
         run: |
 
-          echo "$HARBOR_PASSWORD" | \
+
+          echo "Login Harbor: $HARBOR_REGISTRY"
+
 
           docker login \
-
-          "$HARBOR_REGISTRY" \
-
-          --username "$HARBOR_USERNAME" \
-
-          --password-stdin
+            $HARBOR_REGISTRY \
+            -u $HARBOR_USERNAME \
+            -p $HARBOR_PASSWORD
 
 
 
-      # ==============================
+      # =====================================
       # Build
-      # ==============================
+      # =====================================
 
       - name: 构建 Docker 镜像
 
         run: |
 
+
           docker build \
 
-          -t $HARBOR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+            -t $HARBOR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
 
-          .
+            .
 
 
 
-      # ==============================
-      # Push Harbor
-      # ==============================
+      # =====================================
+      # 查看本地镜像
+      # =====================================
 
-      - name: 上传 Harbor 镜像
+      - name: 查看镜像
 
         run: |
+
+
+          docker images
+
+
+
+      # =====================================
+      # Push Harbor
+      # =====================================
+
+      - name: 上传 Harbor
+
+        run: |
+
 
           docker push \
 
@@ -148,18 +189,19 @@ jobs:
 
 
 
-      # ==============================
+      # =====================================
       # 验证
-      # ==============================
+      # =====================================
 
-      - name: 查看镜像
+      - name: 完成检查
 
         run: |
 
-          docker images
 
-          echo
+          echo "================================"
 
-          echo "========== Harbor Image =========="
+          echo "Harbor Image Uploaded"
 
           echo "$HARBOR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
+
+          echo "================================"
