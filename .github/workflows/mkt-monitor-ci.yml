@@ -134,12 +134,9 @@ jobs:
           -o mc
 
 
+          echo "Check mc"
 
-          echo "Check file"
-
-
-          file mc
-
+          ls -lh mc
 
 
           chmod +x mc
