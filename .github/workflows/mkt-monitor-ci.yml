@@ -1,4 +1,4 @@
-name: mkt-monitor 镜像构建发布 CI
+name: mkt-monitor 镜像构建制品上传 CI
 
 
 on:
@@ -15,14 +15,18 @@ permissions:
 
 env:
 
-  # Harbor 地址
-  HARBOR_REGISTRY: host.docker.internal:8088
 
-  # Harbor 用户
-  HARBOR_USERNAME: admin
+  # ===============================
+  # MinIO
+  # ===============================
 
-  # 实验环境密码
-  HARBOR_PASSWORD: HarborLab-2026-ChangeMe
+  MINIO_ENDPOINT: http://minio.minio-tenant.svc.cluster.local:9000
+
+  MINIO_BUCKET: dockerfile
+
+  MINIO_ACCESS_KEY: harbor
+
+  MINIO_SECRET_KEY: Ru724DDEi3Xs6JjSBluT1UZEEo7CrfulmPk8Lmo7
 
 
 
@@ -32,7 +36,7 @@ jobs:
   build:
 
 
-    name: 构建并上传 Harbor 镜像
+    name: 构建 Docker 镜像并上传 MinIO
 
 
     runs-on: arc-mkt-monitor
@@ -40,6 +44,7 @@ jobs:
 
 
     steps:
+
 
 
       # =====================================
@@ -67,34 +72,17 @@ jobs:
 
           echo
 
-          echo "========== Docker Version =========="
+          echo "========== Docker =========="
 
           docker version
 
 
 
       # =====================================
-      # Harbor 网络检查
-      # =====================================
-
-      - name: Harbor 连通性检查
-
-        run: |
-
-          echo "========== Harbor Test =========="
-
-
-          curl -v \
-          http://$HARBOR_REGISTRY/v2/ || true
-
-
-
-      # =====================================
-      # 设置镜像版本
+      # 设置版本
       #
       # 示例:
-      #
-      # host.docker.internal:8088/library/mkt-monitor:20260929-a1b2c3d
+      # 20260929-a83f21
       #
       # =====================================
 
@@ -110,37 +98,35 @@ jobs:
           IMAGE_TAG=${DATE}-${SHA}
 
 
-          echo "IMAGE_NAME=library/mkt-monitor" >> $GITHUB_ENV
+          echo "IMAGE_NAME=mkt-monitor" >> $GITHUB_ENV
 
           echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
 
 
-          echo "=============================="
-
-          echo "IMAGE TAG: ${IMAGE_TAG}"
-
-          echo "=============================="
+          echo "IMAGE_TAG=${IMAGE_TAG}"
 
 
 
       # =====================================
-      # 登录 Harbor
-      #
-      # 实验环境明文
+      # 安装 MinIO Client
       # =====================================
 
-      - name: 登录 Harbor
+      - name: 安装 MinIO Client
 
         run: |
 
+          curl -L \
+          https://dl.min.io/client/mc/release/linux-amd64/mc \
+          -o mc
 
-          echo "Login Harbor: $HARBOR_REGISTRY"
+
+          chmod +x mc
 
 
-          docker login \
-            $HARBOR_REGISTRY \
-            -u $HARBOR_USERNAME \
-            -p $HARBOR_PASSWORD
+          sudo mv mc /usr/local/bin/mc
+
+
+          mc --version
 
 
 
@@ -155,40 +141,85 @@ jobs:
 
           docker build \
 
-            -t $HARBOR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG \
+          -t $IMAGE_NAME:$IMAGE_TAG \
 
-            .
+          .
 
 
 
       # =====================================
-      # 查看本地镜像
+      # 查看镜像
       # =====================================
 
       - name: 查看镜像
 
         run: |
 
-
           docker images
 
-      - name: Docker Registry Check
-        run: |
-          
-          docker info | grep -A10 "Insecure Registries"
+
 
       # =====================================
-      # Push Harbor
+      # Docker Save
+      #
+      # 生成:
+      #
+      # mkt-monitor-20260929-a83f21.tar
+      #
       # =====================================
 
-      - name: 上传 Harbor
+      - name: 导出 Docker 镜像
 
         run: |
 
 
-          docker push \
+          docker save \
 
-          $HARBOR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG
+          $IMAGE_NAME:$IMAGE_TAG \
+
+          -o ${IMAGE_NAME}-${IMAGE_TAG}.tar
+
+
+
+          ls -lh *.tar
+
+
+
+      # =====================================
+      # MinIO 上传
+      # =====================================
+
+      - name: 上传 MinIO
+
+
+        run: |
+
+
+          echo "========== MinIO Login =========="
+
+
+          mc alias set minio \
+
+          $MINIO_ENDPOINT \
+
+          $MINIO_ACCESS_KEY \
+
+          $MINIO_SECRET_KEY
+
+
+
+          echo "========== Upload =========="
+
+
+          mc cp \
+
+          ${IMAGE_NAME}-${IMAGE_TAG}.tar \
+
+          minio/${MINIO_BUCKET}/${IMAGE_NAME}/${IMAGE_TAG}/
+
+
+
+          echo "Upload Finished"
 
 
 
@@ -198,13 +229,18 @@ jobs:
 
       - name: 完成检查
 
+
         run: |
 
 
-          echo "================================"
+          echo "=============================="
 
-          echo "Harbor Image Uploaded"
+          echo "Docker Artifact Uploaded"
 
-          echo "$HARBOR_REGISTRY/$IMAGE_NAME:$IMAGE_TAG"
 
-          echo "================================"
+          echo "Bucket:"
+
+          echo "${MINIO_BUCKET}/${IMAGE_NAME}/${IMAGE_TAG}"
+
+
+          echo "=============================="
