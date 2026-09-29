@@ -6,19 +6,12 @@ on:
   workflow_dispatch:
 
 
-
 permissions:
 
   contents: read
 
 
-
 env:
-
-
-  # ===============================
-  # MinIO
-  # ===============================
 
   MINIO_ENDPOINT: http://minio.minio-tenant.svc.cluster.local:9000
 
@@ -44,7 +37,6 @@ jobs:
 
 
     steps:
-
 
 
       # =====================================
@@ -80,10 +72,6 @@ jobs:
 
       # =====================================
       # 设置版本
-      #
-      # 示例:
-      # 20260929-a83f21
-      #
       # =====================================
 
       - name: 设置镜像版本
@@ -94,7 +82,6 @@ jobs:
 
           SHA=$(git rev-parse --short HEAD)
 
-
           IMAGE_TAG=${DATE}-${SHA}
 
 
@@ -103,16 +90,12 @@ jobs:
           echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
 
 
-          echo "IMAGE_TAG=${IMAGE_TAG}"
+          echo "IMAGE TAG=${IMAGE_TAG}"
 
 
 
-            # =====================================
-            # =====================================
-            # =====================================
+      # =====================================
       # 安装 MinIO Client
-      # GitHub Release
-      # ARM64 Runner
       # =====================================
 
       - name: 安装 MinIO Client
@@ -129,12 +112,8 @@ jobs:
           echo $MC_URL
 
 
-          curl -fL \
-          $MC_URL \
-          -o mc
+          curl -fL "$MC_URL" -o mc
 
-
-          echo "Check mc"
 
           ls -lh mc
 
@@ -150,19 +129,16 @@ jobs:
 
 
       # =====================================
-      # Build
+      # Docker Build
       # =====================================
 
       - name: 构建 Docker 镜像
 
         run: |
 
-
           docker build \
-
-          -t $IMAGE_NAME:$IMAGE_TAG \
-
-          .
+            -t ${IMAGE_NAME}:${IMAGE_TAG} \
+            .
 
 
 
@@ -180,24 +156,15 @@ jobs:
 
       # =====================================
       # Docker Save
-      #
-      # 生成:
-      #
-      # mkt-monitor-20260929-a83f21.tar
-      #
       # =====================================
 
       - name: 导出 Docker 镜像
 
         run: |
 
-
           docker save \
-
-          $IMAGE_NAME:$IMAGE_TAG \
-
-          -o ${IMAGE_NAME}-${IMAGE_TAG}.tar
-
+            ${IMAGE_NAME}:${IMAGE_TAG} \
+            -o ${IMAGE_NAME}-${IMAGE_TAG}.tar
 
 
           ls -lh *.tar
@@ -210,32 +177,23 @@ jobs:
 
       - name: 上传 MinIO
 
-
         run: |
-
 
           echo "========== MinIO Login =========="
 
 
           mc alias set minio \
-
-          $MINIO_ENDPOINT \
-
-          $MINIO_ACCESS_KEY \
-
-          $MINIO_SECRET_KEY
-
+            ${MINIO_ENDPOINT} \
+            ${MINIO_ACCESS_KEY} \
+            ${MINIO_SECRET_KEY}
 
 
           echo "========== Upload =========="
 
 
           mc cp \
-
-          ${IMAGE_NAME}-${IMAGE_TAG}.tar \
-
-          minio/${MINIO_BUCKET}/${IMAGE_NAME}/${IMAGE_TAG}/
-
+            ${IMAGE_NAME}-${IMAGE_TAG}.tar \
+            minio/${MINIO_BUCKET}/${IMAGE_NAME}/${IMAGE_TAG}/
 
 
           echo "Upload Finished"
@@ -248,16 +206,14 @@ jobs:
 
       - name: 完成检查
 
-
         run: |
-
 
           echo "=============================="
 
           echo "Docker Artifact Uploaded"
 
 
-          echo "Bucket:"
+          echo "Path:"
 
           echo "${MINIO_BUCKET}/${IMAGE_NAME}/${IMAGE_TAG}"
 
