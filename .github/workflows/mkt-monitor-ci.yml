@@ -11,15 +11,27 @@ permissions:
   contents: read
 
 
+
 env:
 
-  MINIO_ENDPOINT: http://minio.minio-tenant.svc.cluster.local:9000
+
+  # ===============================
+  # MinIO Operator Tenant
+  # HTTPS
+  # ===============================
+
+  MINIO_ENDPOINT: https://minio.minio-tenant.svc.cluster.local:443
+
 
   MINIO_BUCKET: dockerfile
 
+
   MINIO_ACCESS_KEY: harbor
 
+
   MINIO_SECRET_KEY: Ru724DDEi3Xs6JjSBluT1UZEEo7CrfulmPk8Lmo7
+
+
 
 
 
@@ -39,6 +51,7 @@ jobs:
     steps:
 
 
+
       # =====================================
       # Checkout
       # =====================================
@@ -46,6 +59,8 @@ jobs:
       - name: 拉取代码
 
         uses: actions/checkout@v4
+
+
 
 
 
@@ -70,8 +85,14 @@ jobs:
 
 
 
+
+
       # =====================================
       # 设置版本
+      #
+      # 示例:
+      # 20260929-a83f21
+      #
       # =====================================
 
       - name: 设置镜像版本
@@ -82,6 +103,7 @@ jobs:
 
           SHA=$(git rev-parse --short HEAD)
 
+
           IMAGE_TAG=${DATE}-${SHA}
 
 
@@ -90,12 +112,21 @@ jobs:
           echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
 
 
+          echo "=============================="
+
           echo "IMAGE TAG=${IMAGE_TAG}"
+
+          echo "=============================="
+
+
+
+
 
 
 
       # =====================================
       # 安装 MinIO Client
+      # ARM64 Runner
       # =====================================
 
       - name: 安装 MinIO Client
@@ -108,11 +139,15 @@ jobs:
           MC_URL="https://github.com/minio/mc/releases/download/${MC_VERSION}/mc.linux-arm64.${MC_VERSION}"
 
 
-          echo "Download:"
-          echo $MC_URL
+          echo "Download MinIO Client"
+
+          echo ${MC_URL}
 
 
-          curl -fL "$MC_URL" -o mc
+          curl -fL "${MC_URL}" -o mc
+
+
+          echo "Check mc"
 
 
           ls -lh mc
@@ -128,6 +163,100 @@ jobs:
 
 
 
+
+
+      # =====================================
+      # MinIO连接测试
+      #
+      # 流程:
+      # 1. 登录
+      # 2. 创建txt
+      # 3. 上传
+      # 4. 查看
+      # 5. 删除
+      #
+      # =====================================
+
+      - name: MinIO 连接测试
+
+        run: |
+
+
+          echo "========== MinIO Login =========="
+
+
+          mc alias set minio \
+            ${MINIO_ENDPOINT} \
+            ${MINIO_ACCESS_KEY} \
+            ${MINIO_SECRET_KEY} \
+            --insecure
+
+
+
+
+          echo "========== Create Test File =========="
+
+
+          echo "MinIO connection test $(date)" > minio-test.txt
+
+
+          cat minio-test.txt
+
+
+
+
+
+          echo "========== Upload Test File =========="
+
+
+          mc cp \
+            minio-test.txt \
+            minio/${MINIO_BUCKET}/test/minio-test.txt \
+            --insecure
+
+
+
+
+
+          echo "========== Check Upload =========="
+
+
+          mc ls \
+            minio/${MINIO_BUCKET}/test/ \
+            --insecure
+
+
+
+
+
+          echo "========== Delete Test File =========="
+
+
+          mc rm \
+            minio/${MINIO_BUCKET}/test/minio-test.txt \
+            --insecure
+
+
+
+
+
+          echo "========== Verify Delete =========="
+
+
+          mc ls \
+            minio/${MINIO_BUCKET}/test/ \
+            --insecure || true
+
+
+
+          echo "MinIO test success"
+
+
+
+
+
+
+
       # =====================================
       # Docker Build
       # =====================================
@@ -136,9 +265,14 @@ jobs:
 
         run: |
 
+
           docker build \
             -t ${IMAGE_NAME}:${IMAGE_TAG} \
             .
+
+
+
+
 
 
 
@@ -150,53 +284,66 @@ jobs:
 
         run: |
 
+
           docker images
+
+
 
 
 
       # =====================================
       # Docker Save
+      #
+      # 输出:
+      #
+      # mkt-monitor-20260929-a83f21.tar
+      #
       # =====================================
 
       - name: 导出 Docker 镜像
 
         run: |
 
+
           docker save \
             ${IMAGE_NAME}:${IMAGE_TAG} \
             -o ${IMAGE_NAME}-${IMAGE_TAG}.tar
+
 
 
           ls -lh *.tar
 
 
 
+
+
+
+
       # =====================================
-      # MinIO 上传
+      # 上传 Docker Artifact 到 MinIO
       # =====================================
 
-      - name: 上传 MinIO
+      - name: 上传 Docker 镜像文件到 MinIO
 
         run: |
 
-          echo "========== MinIO Login =========="
 
+          echo "========== Upload Docker TAR =========="
 
-          mc alias set minio \
-            ${MINIO_ENDPOINT} \
-            ${MINIO_ACCESS_KEY} \
-            ${MINIO_SECRET_KEY}
-
-
-          echo "========== Upload =========="
 
 
           mc cp \
             ${IMAGE_NAME}-${IMAGE_TAG}.tar \
-            minio/${MINIO_BUCKET}/${IMAGE_NAME}/${IMAGE_TAG}/
+            minio/${MINIO_BUCKET}/${IMAGE_NAME}/${IMAGE_TAG}/ \
+            --insecure
+
+
 
 
           echo "Upload Finished"
+
+
+
 
 
 
@@ -208,12 +355,14 @@ jobs:
 
         run: |
 
+
           echo "=============================="
 
           echo "Docker Artifact Uploaded"
 
 
-          echo "Path:"
+          echo "MinIO Path:"
+
 
           echo "${MINIO_BUCKET}/${IMAGE_NAME}/${IMAGE_TAG}"
 
