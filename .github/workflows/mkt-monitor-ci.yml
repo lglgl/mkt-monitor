@@ -6,34 +6,57 @@ on:
 permissions:
   contents: read
 
+
+env:
+  HARBOR_REGISTRY: host.docker.internal:8088
+  IMAGE_NAME: library/mkt-monitor
+
+
 jobs:
   build:
+
     runs-on: arc-mkt-monitor
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Check environment
-        run: |
-          echo "=== Runner ==="
-          uname -a
 
-          echo
-          echo "=== Docker ==="
+      - name: Check Environment
+        run: |
+          uname -a
           docker version
 
-          echo
-          echo "=== Docker Info ==="
-          docker info
 
-      - name: Build Docker Image
+      # 登录 Harbor
+      - name: Login Harbor
         run: |
+          echo "${{ secrets.HARBOR_PASSWORD }}" | \
+          docker login \
+            $HARBOR_REGISTRY \
+            -u "${{ secrets.HARBOR_USERNAME }}" \
+            --password-stdin
+
+
+      # Build
+      - name: Build Image
+        run: |
+
           docker build \
-            --build-arg HARBOR_REGISTRY=harbor.harbor.svc.cluster.local \
-            -t mkt-monitor:test \
+            -t $HARBOR_REGISTRY/$IMAGE_NAME:test \
             .
 
+
+      # Push
+      - name: Push Image
+        run: |
+
+          docker push \
+          $HARBOR_REGISTRY/$IMAGE_NAME:test
+
+
+      # Verify
       - name: Check Image
         run: |
           docker images
